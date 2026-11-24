@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1024" height="1024">
+  <!-- Soft shadow underneath Pip -->
+  <ellipse cx="500" cy="885" rx="250" ry="45" fill="#205B40" fill-opacity="0.12" />
+
+  <!-- Tail feathers -->
+  <path d="M 240 600 Q 70 500 100 640 Q 150 720 280 680 Z" fill="#205B40" />
+
+  <!-- Tiny feet -->
+  <line x1="420" y1="780" x2="420" y2="860" stroke="#D9A43C" stroke-width="26" stroke-linecap="round" />
+  <line x1="560" y1="780" x2="560" y2="860" stroke="#D9A43C" stroke-width="26" stroke-linecap="round" />
+
+  <!-- Plump botanical green body -->
+  <ellipse cx="480" cy="550" rx="280" ry="250" fill="#79A66A" />
+
+  <!-- Soft warm cream belly highlight -->
+  <ellipse cx="570" cy="620" rx="150" ry="140" fill="#F7F4E9" fill-opacity="0.88" />
+
+  <!-- Head circle -->
+  <circle cx="560" cy="340" r="210" fill="#79A66A" />
+
+  <!-- Golden wheat crest / sprout -->
+  <g transform="rotate(-12 520 160)">
+    <line x1="520" y1="180" x2="460" y2="50" stroke="#D9A43C" stroke-width="32" stroke-linecap="round" />
+    <path d="M 490 110 Q 380 60 430 30 Q 500 50 490 110 Z" fill="#D9A43C" />
+    <path d="M 480 90 Q 580 30 550 10 Q 490 40 480 90 Z" fill="#D9A43C" />
+  </g>
+
+  <!-- Leaf-shaped wing with golden wheat vein -->
+  <path d="M 260 440 Q 480 400 500 620 Q 320 680 240 520 Z" fill="#205B40" />
+  <line x1="300" y1="500" x2="440" y2="570" stroke="#D9A43C" stroke-opacity="0.85" stroke-width="25" stroke-linecap="round" />
+
+  <!-- Friendly dark eye + catchlight -->
+  <circle cx="630" cy="310" r="35" fill="#26372D" />
+  <circle cx="620" cy="300" r="13" fill="#FFFFFF" />
+
+  <!-- Warm rosy cheek -->
+  <circle cx="580" cy="390" r="38" fill="#D9A43C" fill-opacity="0.35" />
+
+  <!-- Golden beak -->
+  <path d="M 740 310 L 860 350 L 740 400 Z" fill="#D9A43C" />
+</svg>

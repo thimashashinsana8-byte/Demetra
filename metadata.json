@@ -1,0 +1,6 @@
+{
+  "name": "Demetra",
+  "description": "Demetra - Intelligent Food Redistribution Platform connecting food donors, volunteers, and recipients across Sri Lanka.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

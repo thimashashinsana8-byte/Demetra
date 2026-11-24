@@ -1,0 +1,327 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string
+        && id.size() >= 1
+        && id.size() <= 128
+        && !id.matches('.*[/\\\\].*')
+        && !id.matches('.*\\.\\..*');
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isNonEmptyString(val, maxLen) {
+      return val is string && val.size() >= 1 && val.size() <= maxLen;
+    }
+
+    function isOptionalString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isValidRole(role) {
+      return role in ['DONOR', 'VOLUNTEER', 'RECIPIENT'];
+    }
+
+    function isValidFoodCategory(category) {
+      return category in ['COOKED_MEALS', 'BAKERY', 'FRESH_PRODUCE', 'SHORT_EATS', 'DRY_RATIONS'];
+    }
+
+    function isValidDonationStatus(status) {
+      return status in ['MATCHING', 'VOLUNTEER_ASSIGNED', 'PICKED_UP', 'DELIVERED_VERIFIED', 'CANCELLED'];
+    }
+
+    function isValidRequestStatus(status) {
+      return status in ['PENDING', 'APPROVED', 'IN_TRANSIT', 'FULFILLED', 'CANCELLED'];
+    }
+
+    // -------------------------------------------------------------------------
+    // /users/{userId} - Private PII account record (Owner-only)
+    // -------------------------------------------------------------------------
+    function isValidUserPayload(data, userId) {
+      return data.keys().hasAll(['uid', 'fullName', 'organization', 'district', 'email', 'phone', 'activeRole', 'vehicleOrDietaryNote', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'fullName', 'organization', 'district', 'email', 'phone', 'activeRole', 'vehicleOrDietaryNote', 'createdAt', 'updatedAt'])
+        && data.uid == userId
+        && isNonEmptyString(data.fullName, 120)
+        && isNonEmptyString(data.organization, 140)
+        && isNonEmptyString(data.district, 60)
+        && data.email is string && data.email.size() <= 160
+        && data.phone is string && data.phone.size() <= 32
+        && isValidRole(data.activeRole)
+        && data.vehicleOrDietaryNote is string && data.vehicleOrDietaryNote.size() <= 200
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserPayload(request.resource.data, userId);
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserPayload(request.resource.data, userId)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.uid == resource.data.uid;
+      allow delete: if isOwner(userId);
+    }
+
+    // -------------------------------------------------------------------------
+    // /donors/{donorId} - Public-safe Donor organization directory (no PII)
+    // -------------------------------------------------------------------------
+    function isValidDonorPayload(data, donorId) {
+      return data.keys().hasAll(['userId', 'organizationName', 'donorType', 'district', 'locationName', 'typicalSurplus', 'verified', 'totalHandovers', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'organizationName', 'donorType', 'district', 'locationName', 'typicalSurplus', 'verified', 'totalHandovers', 'createdAt', 'updatedAt'])
+        && data.userId == donorId
+        && isNonEmptyString(data.organizationName, 140)
+        && isNonEmptyString(data.donorType, 80)
+        && isNonEmptyString(data.district, 60)
+        && isNonEmptyString(data.locationName, 160)
+        && data.typicalSurplus is string && data.typicalSurplus.size() <= 200
+        && data.verified is bool
+        && data.totalHandovers is int && data.totalHandovers >= 0 && data.totalHandovers <= 100000
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    match /donors/{donorId} {
+      allow get, list: if isSignedIn();
+      allow create: if isOwner(donorId)
+        && isValidId(donorId)
+        && isValidDonorPayload(request.resource.data, donorId);
+      allow update: if isOwner(donorId)
+        && isValidId(donorId)
+        && isValidDonorPayload(request.resource.data, donorId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(donorId);
+    }
+
+    // -------------------------------------------------------------------------
+    // /volunteers/{volunteerId} - Public-safe Volunteer courier directory (no PII)
+    // -------------------------------------------------------------------------
+    function isValidVolunteerPayload(data, volunteerId) {
+      return data.keys().hasAll(['userId', 'displayName', 'communityGroup', 'district', 'preferredDistrict', 'interestAreas', 'vehicleType', 'carrierCapacityKg', 'availabilityWindow', 'available', 'deliveriesCompleted', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'displayName', 'communityGroup', 'district', 'preferredDistrict', 'interestAreas', 'vehicleType', 'carrierCapacityKg', 'availabilityWindow', 'available', 'deliveriesCompleted', 'createdAt', 'updatedAt'])
+        && data.userId == volunteerId
+        && isNonEmptyString(data.displayName, 120)
+        && data.communityGroup is string && data.communityGroup.size() <= 140
+        && isNonEmptyString(data.district, 60)
+        && isNonEmptyString(data.preferredDistrict, 60)
+        && data.interestAreas is list
+        && data.interestAreas.size() >= 1
+        && data.interestAreas.size() <= 8
+        && isNonEmptyString(data.interestAreas[0], 60)
+        && isNonEmptyString(data.vehicleType, 100)
+        && (data.carrierCapacityKg is int || data.carrierCapacityKg is float)
+        && data.carrierCapacityKg > 0 && data.carrierCapacityKg <= 500
+        && isNonEmptyString(data.availabilityWindow, 80)
+        && data.available is bool
+        && data.deliveriesCompleted is int && data.deliveriesCompleted >= 0 && data.deliveriesCompleted <= 100000
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    match /volunteers/{volunteerId} {
+      allow get, list: if isSignedIn();
+      allow create: if isOwner(volunteerId)
+        && isValidId(volunteerId)
+        && isValidVolunteerPayload(request.resource.data, volunteerId);
+      allow update: if isOwner(volunteerId)
+        && isValidId(volunteerId)
+        && isValidVolunteerPayload(request.resource.data, volunteerId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName', 'communityGroup', 'district', 'preferredDistrict',
+          'interestAreas', 'vehicleType', 'carrierCapacityKg',
+          'availabilityWindow', 'available', 'deliveriesCompleted', 'updatedAt'
+        ]);
+      allow delete: if isOwner(volunteerId);
+    }
+
+    // -------------------------------------------------------------------------
+    // /donations/{donationId} - Surplus food listings & relay state machine
+    // -------------------------------------------------------------------------
+    function isValidDonationPayload(data) {
+      return data.keys().hasAll(['donorUserId', 'donorName', 'donorType', 'title', 'category', 'quantityKg', 'servingsEstimate', 'locationName', 'district', 'pickupWindow', 'expiryNote', 'dietaryTags', 'safetyConfirmed', 'status', 'handoverPin', 'pickupVerified', 'deliveryVerified', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['donorUserId', 'donorName', 'donorType', 'title', 'category', 'quantityKg', 'servingsEstimate', 'locationName', 'district', 'pickupWindow', 'expiryNote', 'dietaryTags', 'safetyConfirmed', 'status', 'handoverPin', 'pickupVerified', 'deliveryVerified', 'assignedVolunteerUserId', 'assignedVolunteerName', 'recipientUserId', 'recipientOrgName', 'createdAt', 'updatedAt'])
+        && isNonEmptyString(data.donorUserId, 128)
+        && isNonEmptyString(data.donorName, 140)
+        && isNonEmptyString(data.donorType, 80)
+        && isNonEmptyString(data.title, 160)
+        && isValidFoodCategory(data.category)
+        && (data.quantityKg is int || data.quantityKg is float)
+        && data.quantityKg > 0 && data.quantityKg <= 5000
+        && data.servingsEstimate is int && data.servingsEstimate >= 1 && data.servingsEstimate <= 50000
+        && isNonEmptyString(data.locationName, 180)
+        && isNonEmptyString(data.district, 60)
+        && isNonEmptyString(data.pickupWindow, 120)
+        && isNonEmptyString(data.expiryNote, 240)
+        && data.dietaryTags is list && data.dietaryTags.size() <= 12
+        && data.safetyConfirmed is bool
+        && isValidDonationStatus(data.status)
+        && data.handoverPin is string && data.handoverPin.size() == 4
+        && data.pickupVerified is bool
+        && data.deliveryVerified is bool
+        && isOptionalString(data, 'assignedVolunteerUserId', 128)
+        && isOptionalString(data, 'assignedVolunteerName', 120)
+        && isOptionalString(data, 'recipientUserId', 128)
+        && isOptionalString(data, 'recipientOrgName', 140)
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isVolunteerAcceptingDonation(newData, oldData) {
+      let changed = newData.diff(oldData).affectedKeys();
+      return oldData.status == 'MATCHING'
+        && changed.hasOnly(['status', 'assignedVolunteerUserId', 'assignedVolunteerName', 'updatedAt'])
+        && newData.status == 'VOLUNTEER_ASSIGNED'
+        && newData.assignedVolunteerUserId == request.auth.uid
+        && isNonEmptyString(newData.assignedVolunteerName, 120)
+        && isValidTimestamp(newData.updatedAt);
+    }
+
+    function isAssignedVolunteerUpdatingDelivery(newData, oldData) {
+      let changed = newData.diff(oldData).affectedKeys();
+      return 'assignedVolunteerUserId' in oldData
+        && oldData.assignedVolunteerUserId == request.auth.uid
+        && changed.hasOnly(['status', 'pickupVerified', 'deliveryVerified', 'updatedAt'])
+        && (
+          (oldData.status == 'VOLUNTEER_ASSIGNED' && newData.status == 'PICKED_UP' && newData.pickupVerified == true && newData.deliveryVerified == oldData.deliveryVerified)
+          ||
+          (oldData.status == 'PICKED_UP' && newData.status == 'DELIVERED_VERIFIED' && newData.pickupVerified == true && newData.deliveryVerified == true)
+        )
+        && isValidTimestamp(newData.updatedAt);
+    }
+
+    function isRecipientClaimingOrConfirmingDonation(newData, oldData) {
+      let changed = newData.diff(oldData).affectedKeys();
+      return (
+        // Recipient claiming an unassigned donation
+        (!( 'recipientUserId' in oldData )
+          && oldData.status in ['MATCHING', 'VOLUNTEER_ASSIGNED']
+          && changed.hasOnly(['recipientUserId', 'recipientOrgName', 'updatedAt'])
+          && newData.recipientUserId == request.auth.uid
+          && isNonEmptyString(newData.recipientOrgName, 140)
+          && isValidTimestamp(newData.updatedAt))
+        ||
+        // Claimed recipient confirming final delivery receipt
+        ('recipientUserId' in oldData
+          && oldData.recipientUserId == request.auth.uid
+          && oldData.status in ['VOLUNTEER_ASSIGNED', 'PICKED_UP']
+          && changed.hasOnly(['status', 'pickupVerified', 'deliveryVerified', 'updatedAt'])
+          && newData.status == 'DELIVERED_VERIFIED'
+          && newData.pickupVerified == true
+          && newData.deliveryVerified == true
+          && isValidTimestamp(newData.updatedAt))
+      );
+    }
+
+    match /donations/{donationId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(donationId)
+        && request.resource.data.donorUserId == request.auth.uid
+        && request.resource.data.status == 'MATCHING'
+        && request.resource.data.pickupVerified == false
+        && request.resource.data.deliveryVerified == false
+        && isValidDonationPayload(request.resource.data);
+      allow update: if isSignedIn()
+        && isValidId(donationId)
+        && isValidDonationPayload(request.resource.data)
+        && request.resource.data.donorUserId == resource.data.donorUserId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (
+          resource.data.donorUserId == request.auth.uid
+          || isVolunteerAcceptingDonation(request.resource.data, resource.data)
+          || isAssignedVolunteerUpdatingDelivery(request.resource.data, resource.data)
+          || isRecipientClaimingOrConfirmingDonation(request.resource.data, resource.data)
+        );
+      allow delete: if isSignedIn() && resource.data.donorUserId == request.auth.uid;
+    }
+
+    // -------------------------------------------------------------------------
+    // /requests/{requestId} - Recipient food requests (Participant-isolated)
+    // -------------------------------------------------------------------------
+    function isValidRequestPayload(data) {
+      return data.keys().hasAll(['donationId', 'donationTitle', 'recipientUserId', 'recipientOrgName', 'donorUserId', 'district', 'requestedPortions', 'dietaryNotes', 'status', 'participantIds', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['donationId', 'donationTitle', 'recipientUserId', 'recipientOrgName', 'donorUserId', 'volunteerUserId', 'volunteerName', 'district', 'requestedPortions', 'dietaryNotes', 'status', 'participantIds', 'createdAt', 'updatedAt'])
+        && isValidId(data.donationId)
+        && isNonEmptyString(data.donationTitle, 160)
+        && isNonEmptyString(data.recipientUserId, 128)
+        && isNonEmptyString(data.recipientOrgName, 140)
+        && isNonEmptyString(data.donorUserId, 128)
+        && isOptionalString(data, 'volunteerUserId', 128)
+        && isOptionalString(data, 'volunteerName', 120)
+        && isNonEmptyString(data.district, 60)
+        && data.requestedPortions is int && data.requestedPortions >= 1 && data.requestedPortions <= 5000
+        && data.dietaryNotes is string && data.dietaryNotes.size() <= 240
+        && isValidRequestStatus(data.status)
+        && data.participantIds is list
+        && data.participantIds.size() >= 1 && data.participantIds.size() <= 3
+        && data.recipientUserId in data.participantIds
+        && data.donorUserId in data.participantIds
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidParticipantRequestUpdate(newData, oldData) {
+      let changed = newData.diff(oldData).affectedKeys();
+      return (
+        // Donor approving request or assigning a volunteer
+        (oldData.donorUserId == request.auth.uid
+          && changed.hasOnly(['status', 'volunteerUserId', 'volunteerName', 'participantIds', 'updatedAt'])
+          && newData.status in ['APPROVED', 'IN_TRANSIT', 'FULFILLED', 'CANCELLED'])
+        ||
+        // Recipient cancelling pending request or confirming fulfillment
+        (oldData.recipientUserId == request.auth.uid
+          && changed.hasOnly(['status', 'dietaryNotes', 'requestedPortions', 'updatedAt'])
+          && newData.status in ['PENDING', 'FULFILLED', 'CANCELLED'])
+        ||
+        // Assigned volunteer updating transit or delivery fulfillment
+        ('volunteerUserId' in oldData
+          && oldData.volunteerUserId == request.auth.uid
+          && changed.hasOnly(['status', 'updatedAt'])
+          && newData.status in ['IN_TRANSIT', 'FULFILLED'])
+      );
+    }
+
+    match /requests/{requestId} {
+      allow get, list: if isSignedIn()
+        && request.auth.uid in resource.data.participantIds;
+      allow create: if isSignedIn()
+        && isValidId(requestId)
+        && request.resource.data.recipientUserId == request.auth.uid
+        && request.resource.data.status == 'PENDING'
+        && isValidRequestPayload(request.resource.data);
+      allow update: if isSignedIn()
+        && isValidId(requestId)
+        && request.auth.uid in resource.data.participantIds
+        && isValidRequestPayload(request.resource.data)
+        && request.resource.data.donationId == resource.data.donationId
+        && request.resource.data.recipientUserId == resource.data.recipientUserId
+        && request.resource.data.donorUserId == resource.data.donorUserId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && isValidParticipantRequestUpdate(request.resource.data, resource.data);
+      allow delete: if isSignedIn() && resource.data.recipientUserId == request.auth.uid;
+    }
+
+    // Global default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

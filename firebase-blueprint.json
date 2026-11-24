@@ -1,0 +1,136 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Private authenticated user profile storing account contact info, role selection, and district.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID matching the document ID." },
+        "fullName": { "type": "string", "description": "Full display name of the user." },
+        "organization": { "type": "string", "description": "Kitchen, business, community group, or shelter name." },
+        "district": { "type": "string", "description": "Selected Sri Lankan district (from 25 districts)." },
+        "email": { "type": "string", "description": "User email address (private PII)." },
+        "phone": { "type": "string", "description": "Sri Lanka contact number (private PII)." },
+        "activeRole": { "type": "string", "enum": ["DONOR", "VOLUNTEER", "RECIPIENT"] },
+        "vehicleOrDietaryNote": { "type": "string", "description": "Role-specific operational note." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "organization", "district", "email", "phone", "activeRole", "vehicleOrDietaryNote", "createdAt", "updatedAt"]
+    },
+    "DonorEntity": {
+      "title": "DonorEntity",
+      "description": "Public-safe food donor profile representing a kitchen, restaurant, bakery, or household partner (no private PII).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID matching the document ID." },
+        "organizationName": { "type": "string", "description": "Public donor kitchen or organization name." },
+        "donorType": { "type": "string", "description": "Category such as Restaurant Partner or Bakery." },
+        "district": { "type": "string", "description": "Operating district in Sri Lanka." },
+        "locationName": { "type": "string", "description": "Neighborhood pickup landmark." },
+        "typicalSurplus": { "type": "string", "description": "Summary of typical surplus food shared." },
+        "verified": { "type": "boolean", "description": "Whether donor onboarding checks are verified." },
+        "totalHandovers": { "type": "integer", "description": "Total verified handovers completed." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "organizationName", "donorType", "district", "locationName", "typicalSurplus", "verified", "totalHandovers", "createdAt", "updatedAt"]
+    },
+    "VolunteerEntity": {
+      "title": "VolunteerEntity",
+      "description": "Public-safe volunteer rider profile with preferred district, interest areas, vehicle, carrier capacity, and availability (no private PII).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID matching the document ID." },
+        "displayName": { "type": "string", "description": "Public first/display name of volunteer courier." },
+        "communityGroup": { "type": "string", "description": "Community courier group or neighborhood team." },
+        "district": { "type": "string", "description": "Active Sri Lankan district." },
+        "preferredDistrict": { "type": "string", "description": "Preferred Sri Lankan district from the 25 districts." },
+        "interestAreas": { "type": "array", "description": "Selected volunteer food rescue interest areas (1 to 8)." },
+        "vehicleType": { "type": "string", "description": "Transport & insulated carrier type." },
+        "carrierCapacityKg": { "type": "number", "description": "Safe food transport capacity in kg." },
+        "availabilityWindow": { "type": "string", "description": "Preferred volunteering schedule window." },
+        "available": { "type": "boolean", "description": "Current availability for pickups." },
+        "deliveriesCompleted": { "type": "integer", "description": "Completed food relay deliveries." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "communityGroup", "district", "preferredDistrict", "interestAreas", "vehicleType", "carrierCapacityKg", "availabilityWindow", "available", "deliveriesCompleted", "createdAt", "updatedAt"]
+    },
+    "FoodDonationEntity": {
+      "title": "FoodDonationEntity",
+      "description": "Surplus food listing published by a donor for volunteer pickup and recipient redistribution.",
+      "type": "object",
+      "properties": {
+        "donorUserId": { "type": "string" },
+        "donorName": { "type": "string" },
+        "donorType": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string", "enum": ["COOKED_MEALS", "BAKERY", "FRESH_PRODUCE", "SHORT_EATS", "DRY_RATIONS"] },
+        "quantityKg": { "type": "number" },
+        "servingsEstimate": { "type": "integer" },
+        "locationName": { "type": "string" },
+        "district": { "type": "string" },
+        "pickupWindow": { "type": "string" },
+        "expiryNote": { "type": "string" },
+        "dietaryTags": { "type": "array", "items": { "type": "string" } },
+        "safetyConfirmed": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["MATCHING", "VOLUNTEER_ASSIGNED", "PICKED_UP", "DELIVERED_VERIFIED", "CANCELLED"] },
+        "handoverPin": { "type": "string" },
+        "pickupVerified": { "type": "boolean" },
+        "deliveryVerified": { "type": "boolean" },
+        "assignedVolunteerUserId": { "type": "string" },
+        "assignedVolunteerName": { "type": "string" },
+        "recipientUserId": { "type": "string" },
+        "recipientOrgName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["donorUserId", "donorName", "donorType", "title", "category", "quantityKg", "servingsEstimate", "locationName", "district", "pickupWindow", "expiryNote", "dietaryTags", "safetyConfirmed", "status", "handoverPin", "pickupVerified", "deliveryVerified", "createdAt", "updatedAt"]
+    },
+    "FoodRequestEntity": {
+      "title": "FoodRequestEntity",
+      "description": "Recipient food request linking recipient organization, donor listing, and assigned volunteer.",
+      "type": "object",
+      "properties": {
+        "donationId": { "type": "string" },
+        "donationTitle": { "type": "string" },
+        "recipientUserId": { "type": "string" },
+        "recipientOrgName": { "type": "string" },
+        "donorUserId": { "type": "string" },
+        "volunteerUserId": { "type": "string" },
+        "volunteerName": { "type": "string" },
+        "district": { "type": "string" },
+        "requestedPortions": { "type": "integer" },
+        "dietaryNotes": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "IN_TRANSIT", "FULFILLED", "CANCELLED"] },
+        "participantIds": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["donationId", "donationTitle", "recipientUserId", "recipientOrgName", "donorUserId", "district", "requestedPortions", "dietaryNotes", "status", "participantIds", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "Owner-only private user account record storing personal contact details and role preferences."
+    },
+    "/donors/{donorId}": {
+      "schema": { "$ref": "#/entities/DonorEntity" },
+      "description": "Verified food donor organization records readable by signed-in users and writable only by owner."
+    },
+    "/volunteers/{volunteerId}": {
+      "schema": { "$ref": "#/entities/VolunteerEntity" },
+      "description": "Active volunteer courier records readable by signed-in users and writable only by owner."
+    },
+    "/donations/{donationId}": {
+      "schema": { "$ref": "#/entities/FoodDonationEntity" },
+      "description": "Surplus food listings published by donors for volunteer pickup and recipient claiming."
+    },
+    "/requests/{requestId}": {
+      "schema": { "$ref": "#/entities/FoodRequestEntity" },
+      "description": "Recipient food requests restricted strictly to participating recipient, donor, and assigned volunteer."
+    }
+  }
+}
